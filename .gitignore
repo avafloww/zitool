@@ -1,0 +1,9 @@
+bin/
+obj/
+/packages/
+*.iml
+/_ReSharper.Caches/
+.idea/
+appsettings.*.json
+.DS_Store
+*.patch
