@@ -2,7 +2,7 @@
 
 namespace ZiPatchLib.Chunk.SqpkCommand;
 
-internal class SqpkPatchInfo : SqpkChunk
+public class SqpkPatchInfo : SqpkChunk
 {
     // This is a NOP on recent patcher versions
     public new static string Command = "X";

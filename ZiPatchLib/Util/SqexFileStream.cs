@@ -7,7 +7,7 @@ public class SqexFileStream : FileStream
     public SqexFileStream(string path, FileMode mode) : base(path, mode, FileAccess.ReadWrite, FileShare.Read,
         1 << 16) { }
 
-    public static SqexFileStream? WaitForStream(string path, FileMode mode, int tries = 0, int sleeptime = 1)
+    public static SqexFileStream? WaitForStream(string path, FileMode mode, int tries = 5, int sleeptime = 1)
     {
         do
         {

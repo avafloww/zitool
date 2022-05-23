@@ -2,7 +2,7 @@
 
 namespace ZiPatchLib.Chunk.SqpkCommand;
 
-internal class SqpkTargetInfo : SqpkChunk
+public class SqpkTargetInfo : SqpkChunk
 {
     // US/EU/JP are Global
     // ZH seems to also be Global

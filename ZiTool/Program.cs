@@ -23,6 +23,10 @@ app.Configure(config =>
         .WithExample(new[] {"inspect", "D2022.04.20.0000.0000.patch", "repository"})
         .WithExample(new[] {"inspect", "D2022.04.20.0000.0000.patch", "type"})
         .WithExample(new[] {"inspect", "D2022.04.20.0000.0000.patch", "minor"});
+
+    config.AddCommand<ApplyCommand>("apply")
+        .WithDescription("Applies a ZiPatch file to a directory with given options.")
+        .WithExample(new[] {"apply", "D2022.04.20.0000.0000.patch", "/path/to/ffxiv"});
 });
 
 return await app.RunAsync(args);

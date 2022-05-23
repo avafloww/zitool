@@ -2,7 +2,7 @@
 
 namespace ZiPatchLib.Chunk.SqpkCommand;
 
-internal class SqpkHeader : SqpkChunk
+public class SqpkHeader : SqpkChunk
 {
     public enum TargetFileKind : byte
     {

@@ -19,10 +19,10 @@ public abstract class SqpackFile : SqexFile
 
     protected string GetExpansionPath()
     {
-        return $@"/sqpack/{GetExpansionFolder(ExpansionId)}/";
+        return $@"sqpack/{GetExpansionFolder(ExpansionId)}/";
     }
 
-    protected virtual string GetFileName(ZiPatchConfig.PlatformId platform)
+    public virtual string GetFileName(ZiPatchConfig.PlatformId platform)
     {
         return $"{GetExpansionPath()}{MainId:x2}{SubId:x4}.{platform.ToString().ToLower()}";
     }

@@ -2,7 +2,7 @@
 
 namespace ZiPatchLib.Chunk.SqpkCommand;
 
-internal class SqpkIndex : SqpkChunk
+public class SqpkIndex : SqpkChunk
 {
     public enum IndexCommandKind : byte
     {

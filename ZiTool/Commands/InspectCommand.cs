@@ -1,7 +1,10 @@
+using System.Text.Json;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using ZiPatchLib;
 using ZiPatchLib.Chunk;
+using ZiPatchLib.Inspection;
+using ZiPatchLib.Util;
 using ZiTool.Commands.Settings;
 using ZiTool.Thaliak;
 using ZiTool.Util;
@@ -21,7 +24,7 @@ public class InspectCommand : AsyncCommand<InspectCommandSettings>
     {
         var fileInfo = new FileInfo(settings.Filename);
 
-        using var zi = ZiPatchFile.FromFileName(fileInfo.FullName);
+        using var zi = new ZiPatchFile(new SqexFileStream(fileInfo.FullName, FileMode.Open));
         FileHeaderChunk? header = null;
         foreach (var chunk in zi.GetChunks())
         {
@@ -52,9 +55,13 @@ public class InspectCommand : AsyncCommand<InspectCommandSettings>
                 case "minor":
                     AnsiConsole.WriteLine(header.MinorVersion);
                     return 0;
+                case "changes":
+                    var changeset = zi.CalculateChangedFiles(new ZiPatchConfig(string.Empty));
+                    AnsiConsole.WriteLine(JsonSerializer.Serialize(changeset));
+                    return 0;
                 default:
                     AnsiConsole.MarkupLine(
-                        "[red]Unknown property.[/] [yellow]Valid properties:[/] [green]repository, type, minor[/]");
+                        "[red]Unknown property.[/] [yellow]Valid properties:[/] [green]repository, type, minor, changes[/]");
                     return 1;
             }
         }
@@ -72,37 +79,48 @@ public class InspectCommand : AsyncCommand<InspectCommandSettings>
 
         if (header.Version >= 3)
         {
-            WriteHeader("Patch Command Count");
-            WriteCommandCounts(header);
-
             WriteHeader("Patch Repository");
             await WriteRepoInfo(header);
+
+            WriteHeader("Patch Command Count");
+            WriteCommandCounts(header.CommandCounts, zi.CalculateActualCounts());
         }
+
+        WriteHeader("[green]+ Added[/]/[red]- Deleted[/]/[yellow]* Modified[/] Files");
+        WriteChangedFiles(zi);
 
         return 0;
     }
 
     private async Task WriteRepoInfo(FileHeaderChunk header)
     {
-        var repositories = await _thaliak.GetRepositories();
         var hash = header.RepositoryName.ToString("x8");
-        var repo = repositories.FirstOrDefault(repo => repo.Slug == hash);
 
         WriteAttributeName("Hash");
         WriteAttributeValue(hash);
 
-        WriteAttributeName("Name");
-        if (repo != null)
+        if (header.RepositoryName == 0)
         {
-            WriteAttributeValue(repo.Name);
-
-            WriteAttributeName("Description");
-            WriteAttributeValue(repo.Description);
+            AnsiConsole.MarkupLine("[yellow]No repository ID set in patch file.[/]");
         }
         else
         {
-            AnsiConsole.MarkupLine("[red]unknown[/]");
-            AnsiConsole.MarkupLine("[yellow]No matching repository hash found in Thaliak.[/]");
+            var repositories = await _thaliak.GetRepositories();
+            var repo = repositories.FirstOrDefault(repo => repo.Slug == hash);
+
+            WriteAttributeName("Name");
+            if (repo != null)
+            {
+                WriteAttributeValue(repo.Name);
+
+                WriteAttributeName("Description");
+                WriteAttributeValue(repo.Description);
+            }
+            else
+            {
+                AnsiConsole.MarkupLine("[red]unknown[/]");
+                AnsiConsole.MarkupLine("[yellow]No matching repository hash found in Thaliak.[/]");
+            }
         }
     }
 
@@ -127,31 +145,55 @@ public class InspectCommand : AsyncCommand<InspectCommandSettings>
         }
     }
 
-    private void WriteCommandCounts(FileHeaderChunk header)
+    private void WriteCommandCountValue(uint fhdr, uint actual)
+    {
+        WriteAttributeValue(fhdr == actual ? fhdr : $"{actual} [gray](FHDR: [/][yellow]{fhdr}[/][gray])[/]");
+    }
+
+    private void WriteCommandCounts(ZiPatchCommandCounts fhdr, ZiPatchCommandCounts actual)
     {
         WriteAttributeName("Total Commands");
-        WriteAttributeValue(header.Commands);
+        WriteCommandCountValue(fhdr.TotalCommands, actual.TotalCommands);
 
         WriteAttributeName("ADIR   (Add Directory)");
-        WriteAttributeValue(header.AddDirectories);
+        WriteCommandCountValue(fhdr.AddDirectories, actual.AddDirectories);
 
         WriteAttributeName("DELD   (Delete Directory)");
-        WriteAttributeValue(header.DeleteDirectories);
+        WriteCommandCountValue(fhdr.DeleteDirectories, actual.DeleteDirectories);
 
         WriteAttributeName("SQPK:H (SqPack Header)");
-        WriteAttributeValue(header.SqpkHeaderCommands);
+        WriteCommandCountValue(fhdr.SqpkHeaderCommands, actual.SqpkHeaderCommands);
 
         WriteAttributeName("SQPK:F (SqPack File Operation)");
-        WriteAttributeValue(header.SqpkFileCommands);
+        WriteCommandCountValue(fhdr.SqpkFileCommands, actual.SqpkFileCommands);
 
         WriteAttributeName("SQPK:A (SqPack Data Add)");
-        WriteAttributeValue(header.SqpkAddCommands);
+        WriteCommandCountValue(fhdr.SqpkAddCommands, actual.SqpkAddCommands);
 
         WriteAttributeName("SQPK:D (SqPack Data Delete)");
-        WriteAttributeValue(header.SqpkDeleteCommands);
+        WriteCommandCountValue(fhdr.SqpkDeleteCommands, actual.SqpkDeleteCommands);
 
         WriteAttributeName("SQPK:E (SqPack Data Expand)");
-        WriteAttributeValue(header.SqpkExpandCommands);
+        WriteCommandCountValue(fhdr.SqpkExpandCommands, actual.SqpkExpandCommands);
+    }
+
+    private void WriteChangedFiles(ZiPatchFile zi)
+    {
+        var changes = zi.CalculateChangedFiles(new ZiPatchConfig(string.Empty));
+        foreach (var file in changes.Added)
+        {
+            AnsiConsole.MarkupLine($"    [green]+ {file}[/]");
+        }
+
+        foreach (var file in changes.Deleted)
+        {
+            AnsiConsole.MarkupLine($"    [red]- {file}[/]");
+        }
+
+        foreach (var file in changes.Modified)
+        {
+            AnsiConsole.MarkupLine($"    [yellow]* {file}[/]");
+        }
     }
 
     private void WriteHeader(string title)

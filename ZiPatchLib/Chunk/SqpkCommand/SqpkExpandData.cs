@@ -2,7 +2,7 @@
 
 namespace ZiPatchLib.Chunk.SqpkCommand;
 
-internal class SqpkExpandData : SqpkChunk
+public class SqpkExpandData : SqpkChunk
 {
     public new static string Command = "E";
 

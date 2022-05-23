@@ -2,7 +2,7 @@
 
 namespace ZiPatchLib.Chunk.SqpkCommand;
 
-internal class SqpkAddData : SqpkChunk
+public class SqpkAddData : SqpkChunk
 {
     public new static string Command = "A";
 

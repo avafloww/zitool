@@ -2,12 +2,12 @@
 
 namespace ZiPatchLib.Util;
 
-internal class SqpackDatFile : SqpackFile
+public class SqpackDatFile : SqpackFile
 {
     public SqpackDatFile(BinaryReader reader) : base(reader) { }
 
 
-    protected override string GetFileName(ZiPatchConfig.PlatformId platform)
+    public override string GetFileName(ZiPatchConfig.PlatformId platform)
     {
         return $"{base.GetFileName(platform)}.dat{FileId}";
     }

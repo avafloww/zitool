@@ -2,7 +2,7 @@
 
 namespace ZiPatchLib.Util;
 
-internal class SqpkCompressedBlock
+public class SqpkCompressedBlock
 {
     public SqpkCompressedBlock(BinaryReader reader)
     {
