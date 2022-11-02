@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Spectre.Cli.Extensions.DependencyInjection;
+using Spectre.Console.Cli.Extensions.DependencyInjection;
 using Spectre.Console.Cli;
 using ZiTool.Commands;
 using ZiTool.Thaliak;
