@@ -1,24 +1,23 @@
 ﻿using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk;
-
-// ReSharper disable once InconsistentNaming
-public class XXXXChunk : ZiPatchChunk
+namespace ZiPatchLib.Chunk
 {
-    // TODO: This... Never happens.
-    public new static string Type = "XXXX";
-
-    public XXXXChunk(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
-
-    protected override void ReadChunk()
+    // ReSharper disable once InconsistentNaming
+    public class XXXXChunk : ZiPatchChunk
     {
-        var start = Reader.BaseStream.Position;
+        // TODO: This... Never happens.
+        public new static string Type = "XXXX";
 
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+        }
 
-    public override string ToString()
-    {
-        return Type;
+        public XXXXChunk(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
+
+        public override string ToString()
+        {
+            return Type;
+        }
     }
 }

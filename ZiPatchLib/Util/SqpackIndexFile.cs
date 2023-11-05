@@ -1,12 +1,13 @@
-﻿namespace ZiPatchLib.Util;
+﻿using System.IO;
 
-public class SqpackIndexFile : SqpackFile
+namespace ZiPatchLib.Util
 {
-    public SqpackIndexFile(BinaryReader reader) : base(reader) { }
-
-
-    public override string GetFileName(ZiPatchConfig.PlatformId platform)
+    class SqpackIndexFile : SqpackFile
     {
-        return $"{base.GetFileName(platform)}.index{(FileId == 0 ? string.Empty : FileId.ToString())}";
+        public SqpackIndexFile(BinaryReader reader) : base(reader) {}
+
+
+        public override string GetFileName(ZiPatchConfig.PlatformId platform) =>
+            $"{base.GetFileName(platform)}.index{(FileId == 0 ? string.Empty : FileId.ToString())}";
     }
 }

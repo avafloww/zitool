@@ -1,22 +1,21 @@
 ﻿using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk;
-
-public class EndOfFileChunk : ZiPatchChunk
+namespace ZiPatchLib.Chunk
 {
-    public new static string Type = "EOF_";
-
-    public EndOfFileChunk(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
-
-    protected override void ReadChunk()
+    public class EndOfFileChunk : ZiPatchChunk
     {
-        var start = Reader.BaseStream.Position;
+        public new static string Type = "EOF_";
 
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+        }
 
-    public override string ToString()
-    {
-        return Type;
+        public EndOfFileChunk(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
+
+        public override string ToString()
+        {
+            return Type;
+        }
     }
 }

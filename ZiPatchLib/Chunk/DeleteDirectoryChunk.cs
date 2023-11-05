@@ -1,33 +1,31 @@
 ﻿using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk;
-
-public class DeleteDirectoryChunk : ZiPatchChunk
+namespace ZiPatchLib.Chunk
 {
-    public new static string Type = "DELD";
-
-    public DeleteDirectoryChunk(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
-
-    public string DirName { get; protected set; }
-
-    protected override void ReadChunk()
+    public class DeleteDirectoryChunk : ZiPatchChunk
     {
-        var start = Reader.BaseStream.Position;
+        public new static string Type = "DELD";
 
-        var dirNameLen = Reader.ReadUInt32BE();
+        public string DirName { get; protected set; }
 
-        DirName = Reader.ReadFixedLengthString(dirNameLen);
+        public DeleteDirectoryChunk(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
 
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+            var dirNameLen = this.Reader.ReadUInt32BE();
 
-    public override void ApplyChunk(ZiPatchConfig config)
-    {
-        Directory.Delete(config.GamePath + DirName);
-    }
+            DirName = this.Reader.ReadFixedLengthString(dirNameLen);
+        }
 
-    public override string ToString()
-    {
-        return $"{Type}:{DirName}";
+        public override void ApplyChunk(ZiPatchConfig config)
+        {
+            Directory.Delete(config.GamePath + DirName);
+        }
+
+        public override string ToString()
+        {
+            return $"{Type}:{DirName}";
+        }
     }
 }

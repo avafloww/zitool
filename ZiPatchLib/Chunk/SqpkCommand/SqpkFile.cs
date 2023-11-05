@@ -1,119 +1,107 @@
-﻿using ZiPatchLib.Util;
+﻿using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk.SqpkCommand;
-
-public class SqpkFile : SqpkChunk
+namespace ZiPatchLib.Chunk.SqpkCommand
 {
-    public enum OperationKind : byte
+    public class SqpkFile : SqpkChunk
     {
-        AddFile = (byte) 'A',
-        RemoveAll = (byte) 'R',
+        public new static string Command = "F";
 
-        // I've seen no cases in the wild of these two
-        DeleteFile = (byte) 'D',
-        MakeDirTree = (byte) 'M'
-    }
-
-    public new static string Command = "F";
-
-    public SqpkFile(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
-
-    public OperationKind Operation { get; protected set; }
-    public long FileOffset { get; protected set; }
-    public ulong FileSize { get; protected set; }
-    public ushort ExpansionId { get; protected set; }
-    public SqexFile TargetFile { get; protected set; }
-
-    public List<long> CompressedDataSourceOffsets { get; protected set; }
-    public List<SqpkCompressedBlock> CompressedData { get; protected set; }
-
-    protected override void ReadChunk()
-    {
-        var start = Reader.BaseStream.Position;
-
-        Operation = (OperationKind) Reader.ReadByte();
-        Reader.ReadBytes(2); // Alignment
-
-        FileOffset = Reader.ReadInt64BE();
-        FileSize = Reader.ReadUInt64BE();
-
-        var pathLen = Reader.ReadUInt32BE();
-
-        ExpansionId = Reader.ReadUInt16BE();
-        Reader.ReadBytes(2);
-
-        TargetFile = new SqexFile(Reader.ReadFixedLengthString(pathLen));
-
-        if (Operation == OperationKind.AddFile)
+        public enum OperationKind : byte
         {
-            CompressedDataSourceOffsets = new List<long>();
-            CompressedData = new List<SqpkCompressedBlock>();
+            AddFile = (byte)'A',
+            RemoveAll = (byte)'R',
 
-            while (Size - Reader.BaseStream.Position + start > 0)
+            // I've seen no cases in the wild of these two
+            DeleteFile = (byte)'D',
+            MakeDirTree = (byte)'M'
+        }
+
+        public OperationKind Operation { get; protected set; }
+        public long FileOffset { get; protected set; }
+        public long FileSize { get; protected set; }
+        public ushort ExpansionId { get; protected set; }
+        public SqexFile TargetFile { get; protected set; }
+
+        public List<long> CompressedDataSourceOffsets { get; protected set; }
+        public List<SqpkCompressedBlock> CompressedData { get; protected set; }
+
+        public SqpkFile(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
+
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+            Operation = (OperationKind)this.Reader.ReadByte();
+            this.Reader.ReadBytes(2); // Alignment
+
+            FileOffset = this.Reader.ReadInt64BE();
+            FileSize = this.Reader.ReadInt64BE();
+
+            var pathLen = this.Reader.ReadUInt32BE();
+
+            ExpansionId = this.Reader.ReadUInt16BE();
+            this.Reader.ReadBytes(2);
+
+            TargetFile = new SqexFile(this.Reader.ReadFixedLengthString(pathLen));
+
+            if (Operation == OperationKind.AddFile)
             {
-                CompressedDataSourceOffsets.Add(Offset + Reader.BaseStream.Position);
-                CompressedData.Add(new SqpkCompressedBlock(Reader));
-                CompressedDataSourceOffsets[CompressedDataSourceOffsets.Count - 1] +=
-                    CompressedData[CompressedData.Count - 1].HeaderSize;
+                CompressedDataSourceOffsets = new();
+                CompressedData = new List<SqpkCompressedBlock>();
+
+                while (advanceAfter.NumBytesRemaining > 0)
+                {
+                    CompressedDataSourceOffsets.Add(Offset + this.Reader.BaseStream.Position);
+                    CompressedData.Add(new SqpkCompressedBlock(this.Reader));
+                    CompressedDataSourceOffsets[CompressedDataSourceOffsets.Count - 1] += CompressedData[CompressedData.Count - 1].HeaderSize;
+                }
             }
         }
 
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
+        private static bool RemoveAllFilter(string filePath) =>
+            !new[] { ".var", "00000.bk2", "00001.bk2", "00002.bk2", "00003.bk2" }.Any(filePath.EndsWith);
 
-    private static bool RemoveAllFilter(string filePath)
-    {
-        return !new[] {".var", "00000.bk2", "00001.bk2", "00002.bk2", "00003.bk2"}.Any(filePath.EndsWith);
-    }
-
-    public override void ApplyChunk(ZiPatchConfig config)
-    {
-        switch (Operation)
+        public override void ApplyChunk(ZiPatchConfig config)
         {
-            // Default behaviour falls through to AddFile, though this shouldn't happen
-            case OperationKind.AddFile:
-            default:
-                // TODO: Check this. I *think* boot usually creates all the folders like sqpack, movie, etc., so this might be kind of a hack
-                TargetFile.CreateDirectoryTree(config.GamePath);
+            switch (Operation)
+            {
+                // Default behaviour falls through to AddFile, though this shouldn't happen
+                case OperationKind.AddFile:
+                default:
+                    // TODO: Check this. I *think* boot usually creates all the folders like sqpack, movie, etc., so this might be kind of a hack
+                    TargetFile.CreateDirectoryTree(config.GamePath);
 
-                var fileStream = config.Store == null
-                    ? TargetFile.OpenStream(config.GamePath, FileMode.OpenOrCreate)
-                    : TargetFile.OpenStream(config.Store, config.GamePath, FileMode.OpenOrCreate);
+                    var fileStream = config.Store == null ? TargetFile.OpenStream(config.GamePath, FileMode.OpenOrCreate) : TargetFile.OpenStream(config.Store, config.GamePath, FileMode.OpenOrCreate);
 
-                if (FileOffset == 0)
-                {
-                    fileStream.SetLength(0);
-                }
+                    if (FileOffset == 0)
+                        fileStream.SetLength(0);
 
-                fileStream.Seek(FileOffset, SeekOrigin.Begin);
-                foreach (var block in CompressedData)
-                {
-                    block.DecompressInto(fileStream);
-                }
+                    fileStream.Seek(FileOffset, SeekOrigin.Begin);
+                    foreach (var block in CompressedData)
+                        block.DecompressInto(fileStream);
 
-                break;
+                    break;
 
-            case OperationKind.RemoveAll:
-                foreach (var file in SqexFile.GetAllExpansionFiles(config.GamePath, ExpansionId)
-                             .Where(RemoveAllFilter))
-                {
-                    File.Delete(file);
-                }
+                case OperationKind.RemoveAll:
+                    foreach (var file in SqexFile.GetAllExpansionFiles(config.GamePath, ExpansionId).Where(RemoveAllFilter))
+                        File.Delete(file);
+                    break;
 
-                break;
+                case OperationKind.DeleteFile:
+                    File.Delete(config.GamePath + "/" + TargetFile.RelativePath);
+                    break;
 
-            case OperationKind.DeleteFile:
-                File.Delete(config.GamePath + "/" + TargetFile.RelativePath);
-                break;
-
-            case OperationKind.MakeDirTree:
-                Directory.CreateDirectory(config.GamePath + "/" + TargetFile.RelativePath);
-                break;
+                case OperationKind.MakeDirTree:
+                    Directory.CreateDirectory(config.GamePath + "/" + TargetFile.RelativePath);
+                    break;
+            }
         }
-    }
 
-    public override string ToString()
-    {
-        return $"{Type}:{Command}:{Operation}:{FileOffset}:{FileSize}:{ExpansionId}:{TargetFile}";
+        public override string ToString()
+        {
+            return $"{Type}:{Command}:{Operation}:{FileOffset}:{FileSize}:{ExpansionId}:{TargetFile}";
+        }
     }
 }

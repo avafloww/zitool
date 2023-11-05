@@ -1,61 +1,71 @@
-﻿using ZiPatchLib.Chunk;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using ZiPatchLib.Util;
+using ZiPatchLib.Chunk;
 using ZiPatchLib.Chunk.SqpkCommand;
 using ZiPatchLib.Inspection;
 
-namespace ZiPatchLib;
-
-public class ZiPatchFile : IDisposable
+namespace ZiPatchLib
 {
-    private static readonly uint[] zipatchMagic =
+    public class ZiPatchFile : IDisposable
     {
-        0x50495A91, 0x48435441, 0x0A1A0A0D
-    };
-
-    private readonly Stream _stream;
-    private readonly long _headPosition;
-    public FileHeaderChunk Header { get; }
-
-    /// <summary>
-    ///     Instantiates a ZiPatchFile from a Stream
-    /// </summary>
-    /// <param name="stream">Stream to a ZiPatch</param>
-    public ZiPatchFile(Stream stream)
-    {
-        _stream = stream;
-
-        var reader = new BinaryReader(stream);
-        if (zipatchMagic.Any(magic => magic != reader.ReadUInt32()))
+        private static readonly uint[] zipatchMagic =
         {
-            throw new ZiPatchException();
-        }
+            0x50495A91, 0x48435441, 0x0A1A0A0D
+        };
 
-        _headPosition = _stream.Position;
+        private readonly Stream _stream;
+        private readonly long _headPosition;
+        public FileHeaderChunk Header { get; }
 
-        // find the file header chunk
-        foreach (var chunk in GetChunks())
+        /// <summary>
+        ///     Instantiates a ZiPatchFile from a Stream
+        /// </summary>
+        /// <param name="stream">Stream to a ZiPatch</param>
+        public ZiPatchFile(Stream stream)
         {
-            if (chunk is FileHeaderChunk fhdr)
+            _stream = stream;
+
+            var reader = new BinaryReader(stream);
+            if (zipatchMagic.Any(magic => magic != reader.ReadUInt32()))
             {
-                Header = fhdr;
-                break;
+                throw new ZiPatchException();
             }
+
+            _headPosition = _stream.Position;
+
+            // find the file header chunk
+            foreach (var chunk in GetChunks())
+            {
+                if (chunk is FileHeaderChunk fhdr)
+                {
+                    Header = fhdr;
+                    break;
+                }
+            }
+
+            if (Header == null)
+            {
+                throw new ZiPatchException("Could not find FHDR chunk");
+            }
+
+            // rewind back to the original position
+            _stream.Seek(_headPosition, SeekOrigin.Begin);
         }
 
-        if (Header == null)
+        /// <summary>
+        /// Instantiates a ZiPatchFile from a file path
+        /// </summary>
+        /// <param name="filepath">Path to patch file</param>
+        public static ZiPatchFile FromFileName(string filepath)
         {
-            throw new ZiPatchException("Could not find FHDR chunk");
+            var stream = SqexFileStream.WaitForStream(filepath, FileMode.Open);
+            return new ZiPatchFile(stream);
         }
 
-        // rewind back to the original position
-        _stream.Seek(_headPosition, SeekOrigin.Begin);
-    }
-
-    public void Dispose()
-    {
-        _stream?.Dispose();
-    }
-
-    public ZiPatchChangeSet CalculateChangedFiles(ZiPatchConfig config)
+        public ZiPatchChangeSet CalculateChangedFiles(ZiPatchConfig config)
     {
         var startPos = _stream.Position;
         _stream.Seek(_headPosition, SeekOrigin.Begin);
@@ -193,14 +203,20 @@ public class ZiPatchFile : IDisposable
         }
     }
 
-    public IEnumerable<ZiPatchChunk> GetChunks()
-    {
-        ZiPatchChunk chunk;
-        do
+        public IEnumerable<ZiPatchChunk> GetChunks()
         {
-            chunk = ZiPatchChunk.GetChunk(_stream);
+            ZiPatchChunk chunk;
+            do
+            {
+                chunk = ZiPatchChunk.GetChunk(_stream);
 
-            yield return chunk;
-        } while (chunk.ChunkType != EndOfFileChunk.Type);
+                yield return chunk;
+            } while (chunk.ChunkType != EndOfFileChunk.Type);
+        }
+
+        public void Dispose()
+        {
+            _stream?.Dispose();
+        }
     }
 }

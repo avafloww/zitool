@@ -1,34 +1,32 @@
 ﻿using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk.SqpkCommand;
-
-public class SqpkPatchInfo : SqpkChunk
+namespace ZiPatchLib.Chunk.SqpkCommand
 {
-    // This is a NOP on recent patcher versions
-    public new static string Command = "X";
-
-    public SqpkPatchInfo(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
-
-    // Don't know what this stuff is for
-    public byte Status { get; protected set; }
-    public byte Version { get; protected set; }
-    public ulong InstallSize { get; protected set; }
-
-    protected override void ReadChunk()
+    internal class SqpkPatchInfo : SqpkChunk
     {
-        var start = Reader.BaseStream.Position;
+        // This is a NOP on recent patcher versions
+        public new static string Command = "X";
 
-        Status = Reader.ReadByte();
-        Version = Reader.ReadByte();
-        Reader.ReadByte(); // Alignment
+        // Don't know what this stuff is for
+        public byte Status { get; protected set; }
+        public byte Version { get; protected set; }
+        public ulong InstallSize { get; protected set; }
 
-        InstallSize = Reader.ReadUInt64BE();
+        public SqpkPatchInfo(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
 
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+            Status = this.Reader.ReadByte();
+            Version = this.Reader.ReadByte();
+            this.Reader.ReadByte(); // Alignment
 
-    public override string ToString()
-    {
-        return $"{Type}:{Command}:{Status}:{Version}:{InstallSize}";
+            InstallSize = this.Reader.ReadUInt64BE();
+        }
+
+        public override string ToString()
+        {
+            return $"{Type}:{Command}:{Status}:{Version}:{InstallSize}";
+        }
     }
 }

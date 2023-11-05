@@ -1,70 +1,65 @@
-﻿using ZiPatchLib.Util;
+﻿using System.IO;
+using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk.SqpkCommand;
-
-public class SqpkHeader : SqpkChunk
+namespace ZiPatchLib.Chunk.SqpkCommand
 {
-    public enum TargetFileKind : byte
+    class SqpkHeader : SqpkChunk
     {
-        Dat = (byte) 'D',
-        Index = (byte) 'I'
-    }
+        public new static string Command = "H";
 
-    public enum TargetHeaderKind : byte
-    {
-        Version = (byte) 'V',
-        Index = (byte) 'I',
-        Data = (byte) 'D'
-    }
-
-    public const int HEADER_SIZE = 1024;
-    public new static string Command = "H";
-
-    public SqpkHeader(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
-
-    public TargetFileKind FileKind { get; protected set; }
-    public TargetHeaderKind HeaderKind { get; protected set; }
-    public SqpackFile TargetFile { get; protected set; }
-
-    public byte[] HeaderData { get; protected set; }
-    public long HeaderDataSourceOffset { get; protected set; }
-
-    protected override void ReadChunk()
-    {
-        var start = Reader.BaseStream.Position;
-
-        FileKind = (TargetFileKind) Reader.ReadByte();
-        HeaderKind = (TargetHeaderKind) Reader.ReadByte();
-        Reader.ReadByte(); // Alignment
-
-        if (FileKind == TargetFileKind.Dat)
+        public enum TargetFileKind : byte
         {
-            TargetFile = new SqpackDatFile(Reader);
+            Dat = (byte)'D',
+            Index = (byte)'I'
         }
-        else
+        public enum TargetHeaderKind : byte
         {
-            TargetFile = new SqpackIndexFile(Reader);
+            Version = (byte)'V',
+            Index = (byte)'I',
+            Data = (byte)'D'
         }
 
-        HeaderDataSourceOffset = Offset + Reader.BaseStream.Position;
-        HeaderData = Reader.ReadBytes(HEADER_SIZE);
+        public const int HEADER_SIZE = 1024;
 
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
+        public TargetFileKind FileKind { get; protected set; }
+        public TargetHeaderKind HeaderKind { get; protected set; }
+        public SqpackFile TargetFile { get; protected set; }
 
-    public override void ApplyChunk(ZiPatchConfig config)
-    {
-        TargetFile.ResolvePath(config.Platform);
+        public byte[] HeaderData { get; protected set; }
+        public long HeaderDataSourceOffset { get; protected set; }
 
-        var file = config.Store == null
-            ? TargetFile.OpenStream(config.GamePath, FileMode.OpenOrCreate)
-            : TargetFile.OpenStream(config.Store, config.GamePath, FileMode.OpenOrCreate);
+        public SqpkHeader(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
 
-        file.WriteFromOffset(HeaderData, HeaderKind == TargetHeaderKind.Version ? 0 : HEADER_SIZE);
-    }
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+            FileKind = (TargetFileKind)this.Reader.ReadByte();
+            HeaderKind = (TargetHeaderKind)this.Reader.ReadByte();
+            this.Reader.ReadByte(); // Alignment
 
-    public override string ToString()
-    {
-        return $"{Type}:{Command}:{FileKind}:{HeaderKind}:{TargetFile}";
+            if (FileKind == TargetFileKind.Dat)
+                TargetFile = new SqpackDatFile(this.Reader);
+            else
+                TargetFile = new SqpackIndexFile(this.Reader);
+
+            HeaderDataSourceOffset = Offset + this.Reader.BaseStream.Position;
+            HeaderData = this.Reader.ReadBytes(HEADER_SIZE);
+        }
+
+        public override void ApplyChunk(ZiPatchConfig config)
+        {
+            TargetFile.ResolvePath(config.Platform);
+
+            var file = config.Store == null ?
+                TargetFile.OpenStream(config.GamePath, FileMode.OpenOrCreate) :
+                TargetFile.OpenStream(config.Store, config.GamePath, FileMode.OpenOrCreate);
+
+            file.WriteFromOffset(HeaderData, HeaderKind == TargetHeaderKind.Version ? 0 : HEADER_SIZE);
+        }
+
+        public override string ToString()
+        {
+            return $"{Type}:{Command}:{FileKind}:{HeaderKind}:{TargetFile}";
+        }
     }
 }

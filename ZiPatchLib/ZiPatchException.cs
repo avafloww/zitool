@@ -1,7 +1,11 @@
-﻿namespace ZiPatchLib;
+﻿using System;
 
-public class ZiPatchException : Exception
+namespace ZiPatchLib
 {
-    public ZiPatchException(string message = "ZiPatch error", Exception? innerException = null) : base(message,
-        innerException) { }
+    public class ZiPatchException : Exception
+    {
+        public ZiPatchException(string message = "ZiPatch error", Exception? innerException = null) : base(message, innerException)
+        {
+        }
+    }
 }
