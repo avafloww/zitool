@@ -1,55 +1,53 @@
-﻿using ZiPatchLib.Util;
+﻿using System.IO;
+using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk.SqpkCommand;
-
-public class SqpkAddData : SqpkChunk
+namespace ZiPatchLib.Chunk.SqpkCommand
 {
-    public new static string Command = "A";
-
-
-    public SqpkAddData(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
-
-
-    public SqpackDatFile TargetFile { get; protected set; }
-    public int BlockOffset { get; protected set; }
-    public int BlockNumber { get; protected set; }
-    public int BlockDeleteNumber { get; protected set; }
-
-    public byte[] BlockData { get; protected set; }
-    public long BlockDataSourceOffset { get; protected set; }
-
-    protected override void ReadChunk()
+    public class SqpkAddData : SqpkChunk
     {
-        var start = Reader.BaseStream.Position;
+        public new static string Command = "A";
+        
+        public SqpackDatFile TargetFile { get; protected set; }
+        public long BlockOffset { get; protected set; }
+        public long BlockNumber { get; protected set; }
+        public long BlockDeleteNumber { get; protected set; }
 
-        Reader.ReadBytes(3); // Alignment
+        public byte[] BlockData { get; protected set; }
+        public long BlockDataSourceOffset { get; protected set; }
 
-        TargetFile = new SqpackDatFile(Reader);
 
-        BlockOffset = Reader.ReadInt32BE() << 7;
-        BlockNumber = Reader.ReadInt32BE() << 7;
-        BlockDeleteNumber = Reader.ReadInt32BE() << 7;
+        public SqpkAddData(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
 
-        BlockDataSourceOffset = Offset + Reader.BaseStream.Position;
-        BlockData = Reader.ReadBytes(BlockNumber);
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+            this.Reader.ReadBytes(3); // Alignment
 
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
+            TargetFile = new SqpackDatFile(this.Reader);
 
-    public override void ApplyChunk(ZiPatchConfig config)
-    {
-        TargetFile.ResolvePath(config.Platform);
+            BlockOffset = (long)this.Reader.ReadUInt32BE() << 7;
+            BlockNumber = (long)this.Reader.ReadUInt32BE() << 7;
+            BlockDeleteNumber = (long)this.Reader.ReadUInt32BE() << 7;
 
-        var file = config.Store == null
-            ? TargetFile.OpenStream(config.GamePath, FileMode.OpenOrCreate)
-            : TargetFile.OpenStream(config.Store, config.GamePath, FileMode.OpenOrCreate);
+            BlockDataSourceOffset = Offset + this.Reader.BaseStream.Position;
+            BlockData = this.Reader.ReadBytes(checked((int)BlockNumber));
+        }
 
-        file.WriteFromOffset(BlockData, BlockOffset);
-        file.Wipe(BlockDeleteNumber);
-    }
+        public override void ApplyChunk(ZiPatchConfig config)
+        {
+            TargetFile.ResolvePath(config.Platform);
 
-    public override string ToString()
-    {
-        return $"{Type}:{Command}:{TargetFile}:{BlockOffset}:{BlockNumber}:{BlockDeleteNumber}";
+            var file = config.Store == null ?
+                TargetFile.OpenStream(config.GamePath, FileMode.OpenOrCreate) :
+                TargetFile.OpenStream(config.Store, config.GamePath, FileMode.OpenOrCreate);
+
+            file.WriteFromOffset(BlockData, BlockOffset);
+            file.Wipe(BlockDeleteNumber);
+        }
+
+        public override string ToString()
+        {
+            return $"{Type}:{Command}:{TargetFile}:{BlockOffset}:{BlockNumber}:{BlockDeleteNumber}";
+        }
     }
 }

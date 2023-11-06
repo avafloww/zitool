@@ -1,51 +1,49 @@
 ﻿using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk.SqpkCommand;
-
-public class SqpkIndex : SqpkChunk
+namespace ZiPatchLib.Chunk.SqpkCommand
 {
-    public enum IndexCommandKind : byte
+    class SqpkIndex : SqpkChunk
     {
-        Add = (byte) 'A',
-        Delete = (byte) 'D'
-    }
+        // This is a NOP on recent patcher versions.
+        public new static string Command = "I";
 
-    // This is a NOP on recent patcher versions.
-    public new static string Command = "I";
+        public enum IndexCommandKind : byte
+        {
+            Add = (byte)'A',
+            Delete = (byte)'D'
+        }
+
+        public IndexCommandKind IndexCommand { get; protected set; }
+        public bool IsSynonym { get; protected set; }
+        public SqpackIndexFile TargetFile { get; protected set; }
+        public ulong FileHash { get; protected set; }
+        public uint BlockOffset { get; protected set; }
+
+        // TODO: Figure out what this is used for
+        public uint BlockNumber { get; protected set; }
 
 
-    public SqpkIndex(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
 
-    public IndexCommandKind IndexCommand { get; protected set; }
-    public bool IsSynonym { get; protected set; }
-    public SqpackIndexFile TargetFile { get; protected set; }
-    public ulong FileHash { get; protected set; }
-    public uint BlockOffset { get; protected set; }
+        public SqpkIndex(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
 
-    // TODO: Figure out what this is used for
-    public uint BlockNumber { get; protected set; }
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+            IndexCommand = (IndexCommandKind)this.Reader.ReadByte();
+            IsSynonym = this.Reader.ReadBoolean();
+            this.Reader.ReadByte(); // Alignment
 
-    protected override void ReadChunk()
-    {
-        var start = Reader.BaseStream.Position;
+            TargetFile = new SqpackIndexFile(this.Reader);
 
-        IndexCommand = (IndexCommandKind) Reader.ReadByte();
-        IsSynonym = Reader.ReadBoolean();
-        Reader.ReadByte(); // Alignment
+            FileHash = this.Reader.ReadUInt64BE();
 
-        TargetFile = new SqpackIndexFile(Reader);
+            BlockOffset = this.Reader.ReadUInt32BE();
+            BlockNumber = this.Reader.ReadUInt32BE();
+        }
 
-        FileHash = Reader.ReadUInt64BE();
-
-        BlockOffset = Reader.ReadUInt32BE();
-        BlockNumber = Reader.ReadUInt32BE();
-
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
-
-    public override string ToString()
-    {
-        return
-            $"{Type}:{Command}:{IndexCommand}:{IsSynonym}:{TargetFile}:{FileHash:X8}:{BlockOffset}:{BlockNumber}";
+        public override string ToString()
+        {
+            return $"{Type}:{Command}:{IndexCommand}:{IsSynonym}:{TargetFile}:{FileHash:X8}:{BlockOffset}:{BlockNumber}";
+        }
     }
 }

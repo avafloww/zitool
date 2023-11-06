@@ -1,34 +1,32 @@
 ﻿using ZiPatchLib.Util;
 
-namespace ZiPatchLib.Chunk;
-
-public class AddDirectoryChunk : ZiPatchChunk
+namespace ZiPatchLib.Chunk
 {
-    public new static string Type = "ADIR";
-
-
-    public AddDirectoryChunk(ChecksumBinaryReader reader, int offset, int size) : base(reader, offset, size) { }
-
-    public string DirName { get; protected set; }
-
-    protected override void ReadChunk()
+    public class AddDirectoryChunk : ZiPatchChunk
     {
-        var start = Reader.BaseStream.Position;
+        public new static string Type = "ADIR";
 
-        var dirNameLen = Reader.ReadUInt32BE();
+        public string DirName { get; protected set; }
 
-        DirName = Reader.ReadFixedLengthString(dirNameLen);
+        protected override void ReadChunk()
+        {
+            using var advanceAfter = new AdvanceOnDispose(this.Reader, Size);
+            var dirNameLen = this.Reader.ReadUInt32BE();
 
-        Reader.ReadBytes(Size - (int) (Reader.BaseStream.Position - start));
-    }
+            DirName = this.Reader.ReadFixedLengthString(dirNameLen);
+        }
 
-    public override void ApplyChunk(ZiPatchConfig config)
-    {
-        Directory.CreateDirectory(config.GamePath + DirName);
-    }
 
-    public override string ToString()
-    {
-        return $"{Type}:{DirName}";
+        public AddDirectoryChunk(ChecksumBinaryReader reader, long offset, long size) : base(reader, offset, size) {}
+
+        public override void ApplyChunk(ZiPatchConfig config)
+        {
+            Directory.CreateDirectory(config.GamePath + DirName);
+        }
+
+        public override string ToString()
+        {
+            return $"{Type}:{DirName}";
+        }
     }
 }

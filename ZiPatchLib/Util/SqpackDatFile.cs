@@ -1,37 +1,37 @@
-﻿using System.Text;
+﻿using System.IO;
+using System.Text;
 
-namespace ZiPatchLib.Util;
-
-public class SqpackDatFile : SqpackFile
+namespace ZiPatchLib.Util
 {
-    public SqpackDatFile(BinaryReader reader) : base(reader) { }
-
-
-    public override string GetFileName(ZiPatchConfig.PlatformId platform)
+    public class SqpackDatFile : SqpackFile
     {
-        return $"{base.GetFileName(platform)}.dat{FileId}";
-    }
+        public SqpackDatFile(BinaryReader reader) : base(reader) {}
 
 
-    public static void WriteEmptyFileBlockAt(SqexFileStream stream, int offset, int blockNumber)
-    {
-        stream.WipeFromOffset(blockNumber << 7, offset);
-        stream.Position = offset;
+        public override string GetFileName(ZiPatchConfig.PlatformId platform) =>
+            $"{base.GetFileName(platform)}.dat{FileId}";
 
-        using (var file = new BinaryWriter(stream, Encoding.Default, true))
+
+        public static void WriteEmptyFileBlockAt(SqexFileStream stream, long offset, long blockNumber)
         {
-            // FileBlockHeader - the 0 writes are technically unnecessary but are in for illustrative purposes
+            stream.WipeFromOffset(blockNumber << 7, offset);
+            stream.Position = offset;
 
-            // Block size
-            file.Write(1 << 7);
-            // ????
-            file.Write(0);
-            // File size
-            file.Write(0);
-            // Total number of blocks?
-            file.Write(blockNumber - 1);
-            // Used number of blocks?
-            file.Write(0);
+            using (var file = new BinaryWriter(stream, Encoding.Default, true))
+            {
+                // FileBlockHeader - the 0 writes are technically unnecessary but are in for illustrative purposes
+
+                // Block size
+                file.Write(1 << 7);
+                // ????
+                file.Write(0);
+                // File size
+                file.Write(0);
+                // Total number of blocks?
+                file.Write(blockNumber - 1);
+                // Used number of blocks?
+                file.Write(0);
+            }
         }
     }
 }
